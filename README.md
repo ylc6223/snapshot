@@ -30,35 +30,56 @@ sequenceDiagram
     end
 ```
 
-## 配置
+## 配置指南
 
-### 1. 创建仓库
+### 1. 准备工作
 
-```bash
-# 克隆并推送到你的 GitHub
-git clone <this-repo>
-cd snapshot
-git remote set-url origin https://github.com/<your-username>/snapshot.git
-git push -u origin main
-```
+在 GitHub 上创建一个新仓库（建议设为 **Public** 以获得 Actions 无限执行时间，Secrets 是安全的）。
 
-### 2. 配置 Secrets
+### 2. 获取 Cloudflare 凭据
 
-在 GitHub 仓库 **Settings → Secrets and variables → Actions** 中添加：
+为了让 GitHub Actions 能够访问 R2 和上传图片，你需要准备以下参数：
 
-| Secret 名称 | 说明 | 示例值 |
-|------------|------|--------|
-| `R2_ACCOUNT_ID` | Cloudflare 账户 ID | `abc123...` |
-| `R2_ACCESS_KEY_ID` | R2 访问密钥 ID | `abc123...` |
-| `R2_SECRET_ACCESS_KEY` | R2 密钥 | `secret...` |
-| `R2_BUCKET_NAME` | R2 存储桶名称 | `screenshots` |
-| `R2_PUBLIC_URL` | R2 公共访问 URL | `https://images.example.com` |
-| `API_BASE_URL` | Next.js 应用地址 | `https://design.example.com` |
-| `DATABASE_API_KEY` | API 鉴权密钥 | `sb_secret_...` |
+#### 🔹 账户 ID (R2_ACCOUNT_ID)
+1. 登录 [Cloudflare 控制面板](https://dash.cloudflare.com/)。
+2. 在浏览器地址栏 URL 中查找：`dash.cloudflare.com/` 后面那一串 **32 位字母和数字**。
+3. 或者在左侧菜单进入 **R2**，右侧边栏会显示 **Account ID**。
 
-### 3. 启用 Actions
+#### 🔹 R2 API 令牌 (R2_ACCESS_KEY_ID & R2_SECRET_ACCESS_KEY)
+1. 进入 Cloudflare **R2** 页面。
+2. 点击右侧的 **Manage R2 API Tokens**。
+3. 点击 **Create API token**。
+   - **Token name**: 建议叫 `github-actions-screenshot`。
+   - **Permissions**: 选择 **Object Read & Write** (必选)。
+   - **Bucket scope**: 选择 **Specific buckets only**，勾选你的截图存储桶。
+4. 点击 **Create API Token**。
+5. **保存结果**：
+   - **Access Key ID** -> 对应 `R2_ACCESS_KEY_ID`
+   - **Secret Access Key** -> 对应 `R2_SECRET_ACCESS_KEY` (注意：只显示一次)。
 
-确保仓库 **Settings → Actions → General** 中启用 Actions。
+#### 🔹 公共访问地址 (R2_PUBLIC_URL)
+- 这是你的图片 CDN 基础 URL。
+- 如果你在存储桶的 **Settings -> Public Access** 中绑定了域名，填入绑定域名（如 `https://images.example.com`）。
+- 如果没有，使用 Cloudflare 提供的 `https://pub-xxx.r2.dev` 地址。
+
+### 3. 配置 GitHub Secrets
+
+进入你的 GitHub 仓库 **Settings → Secrets and variables → Actions**，点击 **New repository secret**，添加以下 7 个密钥：
+
+| Secret 名称 | 来源 | 说明 |
+|------------|------|------|
+| `R2_ACCOUNT_ID` | Cloudflare 控制台 | 32 位账户 ID |
+| `R2_ACCESS_KEY_ID` | API Token 页面 | R2 访问 ID |
+| `R2_SECRET_ACCESS_KEY` | API Token 页面 | R2 访问密钥 |
+| `R2_BUCKET_NAME` | 你的配置 | 存储桶名称 |
+| `R2_PUBLIC_URL` | 你的配置 | CDN 基础 URL (含 https://) |
+| `API_BASE_URL` | 你的配置 | Next.js 应用公网地址 |
+| `DATABASE_API_KEY` | 你的配置 | 原 Worker 使用的 API 通信密钥 |
+
+### 4. 启用 Actions
+
+默认情况下，手动触发的工作流可能需要启用。进入仓库 **Settings → Actions → General**，确保选择了 **Allow all actions and reusable workflows**。
+
 
 ## 触发方式
 
