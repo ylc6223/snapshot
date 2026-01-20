@@ -1,0 +1,63 @@
+# Screenshot Service 批量截图工作流
+# 
+# 触发方式:
+# 1. 定时触发: 每天 UTC 00:00 (北京时间 08:00)
+# 2. 手动触发: GitHub Actions 页面点击 "Run workflow"
+# 3. API 触发: POST /repos/{owner}/{repo}/dispatches
+
+name: Screenshot Batch
+
+on:
+  # 定时触发 - 每天 UTC 00:00 (北京时间 08:00)
+  schedule:
+    - cron: '0 0 * * *'
+  
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '最大处理数量 (留空则处理全部)'
+        required: false
+        default: ''
+  
+  # API 触发 (供 Next.js 调用)
+  repository_dispatch:
+    types: [screenshot_request]
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 小时超时
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: 📦 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📚 安装依赖
+        run: npm ci
+
+      - name: 🎭 安装 Playwright 浏览器
+        run: npx playwright install chromium --with-deps
+
+      - name: 📸 执行截图任务
+        env:
+          # R2 配置
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # API 配置
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          DATABASE_API_KEY: ${{ secrets.DATABASE_API_KEY }}
+        run: npm start
+
+      - name: 📊 任务完成
+        if: always()
+        run: echo "截图任务已完成，请查看上方日志了解详情"

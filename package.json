@@ -1,0 +1,23 @@
+{
+  "name": "screenshot-service",
+  "version": "1.0.0",
+  "description": "Batch screenshot service using Playwright and Cloudflare R2",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "test:single": "tsx src/test-single.ts",
+    "test:full": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
