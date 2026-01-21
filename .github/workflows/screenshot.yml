@@ -56,6 +56,8 @@ jobs:
           # API 配置
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           DATABASE_API_KEY: ${{ secrets.DATABASE_API_KEY }}
+          # 动态参数 (用于精准模式)
+          RESOURCE_IDS: ${{ github.event.client_payload.resourceIds }}
         run: npm start
 
       - name: 📊 任务完成

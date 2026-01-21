@@ -66,45 +66,55 @@ async function main(): Promise<void> {
     let successCount = 0;
     let failCount = 0;
 
+    // 获取由 GitHub Actions 传入的指定 ID
+    const resourceIdsStr = process.env.RESOURCE_IDS;
+    const initialIds = resourceIdsStr ? resourceIdsStr.split(',').filter(id => id.trim()) : undefined;
+
     try {
-        // 1. 获取待处理资源
-        const resources = await fetchNeededResources();
-
-        if (resources.length === 0) {
-            console.log('✨ 没有需要处理的资源，任务完成');
-            return;
-        }
-
-        console.log(`\n📋 开始处理 ${resources.length} 个资源...\n`);
-
-        // 2. 初始化浏览器
+        // 1. 初始化浏览器
         await initBrowser();
 
-        // 3. 循环处理每个资源
-        for (let i = 0; i < resources.length; i++) {
-            const resource = resources[i];
-            console.log(`\n[${i + 1}/${resources.length}] 处理: ${resource.url}`);
-            console.log('-'.repeat(50));
+        if (initialIds && initialIds.length > 0) {
+            // --- 精准模式 ---
+            console.log(`🎯 进入精准模式，处理指定 ID: ${initialIds.length} 个`);
+            const resources = await fetchNeededResources(initialIds);
+            if (resources.length > 0) {
+                const results = await processBatch(resources);
+                successCount += results.success;
+                failCount += results.fail;
+            } else {
+                console.log('⚠️ 未找到指定的资源记录');
+            }
+        } else {
+            // --- 全量/深度模式 ---
+            console.log('🌊 进入全量深度模式 (Until-Empty Logic)');
+            let loopCount = 0;
+            const MAX_LOOPS = 50; // 安全阈值，防止无限循环
+            let hasMore = true;
 
-            const result = await processResource(resource.id, resource.url);
+            while (hasMore && loopCount < MAX_LOOPS) {
+                loopCount++;
+                console.log(`\n🔄 正在请求第 ${loopCount} 批任务...`);
 
-            // 4. 回填结果到数据库
-            try {
-                if (result.success && result.screenshotUrl) {
-                    await updateResourceScreenshot(resource.id, {
-                        screenshotUrl: result.screenshotUrl,
-                        screenshotUpdatedAt: new Date().toISOString(),
-                    });
-                    successCount++;
-                } else {
-                    await updateResourceScreenshot(resource.id, {
-                        screenshotError: result.error || '未知错误',
-                    });
-                    failCount++;
+                const resources = await fetchNeededResources();
+
+                if (!resources || resources.length === 0) {
+                    console.log('✨ 所有积压任务处理完毕');
+                    hasMore = false;
+                    break;
                 }
-            } catch (updateError) {
-                console.error(`❌ 回填失败: ${resource.id}`, updateError);
-                failCount++;
+
+                console.log(`📋 本批次开始处理 ${resources.length} 个资源...`);
+                const results = await processBatch(resources);
+                successCount += results.success;
+                failCount += results.fail;
+
+                // 如果本批次处理完已经是最后一批（后端通常有限额），则继续请求
+                // 直到后端返回空列表为止
+            }
+
+            if (loopCount >= MAX_LOOPS) {
+                console.warn(`🛑 达到最大循环次数 (${MAX_LOOPS})，优雅结束。`);
             }
         }
     } catch (error) {
@@ -122,6 +132,42 @@ async function main(): Promise<void> {
     console.log(`   ❌ 失败: ${failCount}`);
     console.log(`   📝 总计: ${successCount + failCount}`);
     console.log('='.repeat(60));
+}
+
+/**
+ * 集中处理一批资源
+ */
+async function processBatch(resources: any[]): Promise<{ success: number; fail: number }> {
+    let success = 0;
+    let fail = 0;
+
+    for (let i = 0; i < resources.length; i++) {
+        const resource = resources[i];
+        console.log(`\n[子任务 ${i + 1}/${resources.length}] 处理: ${resource.url}`);
+        console.log('-'.repeat(40));
+
+        const result = await processResource(resource.id, resource.url);
+
+        try {
+            if (result.success && result.screenshotUrl) {
+                await updateResourceScreenshot(resource.id, {
+                    screenshotUrl: result.screenshotUrl,
+                    screenshotUpdatedAt: new Date().toISOString(),
+                });
+                success++;
+            } else {
+                await updateResourceScreenshot(resource.id, {
+                    screenshotError: result.error || '未知错误',
+                });
+                fail++;
+            }
+        } catch (updateError) {
+            console.error(`❌ API 回填失败: ${resource.id}`, updateError);
+            fail++;
+        }
+    }
+
+    return { success, fail };
 }
 
 // 运行主函数

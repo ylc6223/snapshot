@@ -27,10 +27,15 @@ export interface UpdatePayload {
  * 获取待截图的资源列表
  * 调用: GET /api/admin/resources/screenshot/needed
  */
-export async function fetchNeededResources(): Promise<Resource[]> {
-    const url = `${API_BASE_URL}/api/admin/resources/screenshot/needed`;
+export async function fetchNeededResources(ids?: string[]): Promise<Resource[]> {
+    let url = `${API_BASE_URL}/api/admin/resources/screenshot/needed`;
 
-    console.log(`📋 正在获取待截图资源列表...`);
+    if (ids && ids.length > 0) {
+        const params = new URLSearchParams({ ids: ids.join(',') });
+        url += `?${params.toString()}`;
+    }
+
+    console.log(`📋 正在获取待截图资源列表...${ids ? '(精准模式)' : '(全量模式)'}`);
 
     const response = await fetch(url, {
         method: 'GET',
@@ -46,9 +51,9 @@ export async function fetchNeededResources(): Promise<Resource[]> {
 
     const data: NeededResponse = await response.json();
 
-    console.log(`✅ 获取到 ${data.total} 个待处理资源`);
+    console.log(`✅ 获取到 ${data.resources?.length || 0} 个待处理资源`);
 
-    return data.resources;
+    return data.resources || [];
 }
 
 /**
